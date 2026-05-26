@@ -6,6 +6,11 @@
 // edge-caches the result, and returns ONE small bundle — much faster and more
 // reliable than three transpacific fetches from the client. The client falls
 // back to calling the APIs directly if this isn't deployed, so it's optional.
+//
+// Resilience: it also stashes the last GOOD bundle in the edge cache. If an
+// upstream is down (e.g. Open-Meteo returns 502, as it sometimes does), it
+// serves that last-good bundle (flagged `stale:true`) instead of failing —
+// so the whole site doesn't go dark during an upstream blip.
 
 export async function onRequestGet({ request }) {
   const u = new URL(request.url);
@@ -34,8 +39,45 @@ export async function onRequestGet({ request }) {
   if (pc && hc) tasks.push(get(`https://tide736.net/api/get_tide.php?pc=${pc}&hc=${hc}&yr=${yr}&mn=${mn}&dy=${dy}&rg=week`));
   const [fx, mx, td] = await Promise.all(tasks);
 
-  if (!fx || !mx) return json({ error: 'upstream unavailable' }, 502);
-  return json({ fx, mx, td: td || null }, 200);
+  // a private, same-origin key for the last-good copy (kept separate from this
+  // response's own edge caching so the two never collide)
+  const cache = caches.default;
+  const lastGoodKey = new Request(new URL(`/__bundle-cache?lat=${lat}&lon=${lon}&pc=${pc || ''}&hc=${hc || ''}`, request.url).toString());
+
+  if (fx && mx) {
+    const body = JSON.stringify({ fx, mx, td: td || null, at: Date.now() });
+    // stash a long-lived copy (24h) so we can fall back to it during an outage
+    try { await cache.put(lastGoodKey, new Response(body, { headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=86400' } })); } catch {}
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'access-control-allow-origin': '*',
+        'cache-control': 'public, max-age=600, s-maxage=1800'
+      }
+    });
+  }
+
+  // an upstream is down — serve the last good bundle if we have one
+  try {
+    const hit = await cache.match(lastGoodKey);
+    if (hit) {
+      const txt = await hit.text();
+      const obj = JSON.parse(txt);
+      obj.stale = true;                                   // let the client note it's not fresh
+      return new Response(JSON.stringify(obj), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'access-control-allow-origin': '*',
+          'cache-control': 'public, max-age=300',
+          'x-stale': '1'
+        }
+      });
+    }
+  } catch {}
+
+  return json({ error: 'upstream unavailable' }, 502);
 }
 
 function json(obj, status) {
@@ -44,7 +86,6 @@ function json(obj, status) {
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'access-control-allow-origin': '*',
-      // visitors may reuse for 10 min; the edge holds it 30 min
       'cache-control': 'public, max-age=600, s-maxage=1800'
     }
   });
