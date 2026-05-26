@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>夜光虫 Forecast · Sea Sparkle Forecast — Enoshima / Shōnan</title>
+<meta name="description" content="An educated guess at when bioluminescent plankton (Noctiluca scintillans / 夜光虫) are most likely to glow on the Shōnan coast, from live sea temperature, wind, wave, tide and moon data." />
+<style>
+  :root{
+    --bg0:#02060f; --bg1:#051427; --bg2:#082338;
+    --ink:#eaf6ff; --ink-dim:#9fb6cc; --ink-faint:#6c8198;
+    --glow:#42f5ff; --glow-soft:#1fb9d6; --teal:#2bd4c4;
+    --card:rgba(13,34,56,.55); --card-line:rgba(86,180,220,.18);
+    --bar-track:rgba(120,160,190,.16);
+    --r:18px; --r-sm:12px;
+    --maxw:880px;
+    --font:'Helvetica Neue',-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN','Hiragino Sans','Yu Gothic',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:var(--font); color:var(--ink); line-height:1.55;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #0a2a47 0%, var(--bg1) 38%, var(--bg0) 100%) fixed;
+    min-height:100vh; overflow-x:hidden;
+    padding:0 16px env(safe-area-inset-bottom) 16px;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto}
+
+  /* ---------- hero / header ---------- */
+  header{position:relative;padding:46px 4px 14px;text-align:center}
+  .sparkles{position:absolute;inset:-10px 0 0;overflow:hidden;pointer-events:none;z-index:0}
+  .sparkles i{position:absolute;width:3px;height:3px;border-radius:50%;
+    background:var(--glow);box-shadow:0 0 6px 1px var(--glow);
+    opacity:0;animation:tw var(--d,4s) ease-in-out infinite var(--delay,0s)}
+  @keyframes tw{0%,100%{opacity:0;transform:scale(.4)}45%{opacity:.85;transform:scale(1)}}
+  .kicker{position:relative;z-index:1;font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--glow-soft);font-weight:600}
+  h1{position:relative;z-index:1;font-size:clamp(28px,7vw,46px);line-height:1.05;margin:.18em 0 .1em;
+    font-weight:800;letter-spacing:-.01em;
+    text-shadow:0 0 26px rgba(66,245,255,.35)}
+  h1 .jp{display:block;font-weight:700;font-size:.62em;color:var(--glow);letter-spacing:.04em;
+    text-shadow:0 0 22px rgba(66,245,255,.5)}
+  .sub{position:relative;z-index:1;color:var(--ink-dim);font-size:14px;max-width:46ch;margin:6px auto 0}
+
+  /* ---------- location bar ---------- */
+  .locbar{position:relative;z-index:1;display:flex;gap:8px;justify-content:center;align-items:center;
+    flex-wrap:wrap;margin:18px auto 4px}
+  .locbar select{
+    appearance:none;background:var(--card);color:var(--ink);border:1px solid var(--card-line);
+    border-radius:999px;padding:9px 38px 9px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M2 4l4 4 4-4' stroke='%2342f5ff' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 14px center}
+  .updated{font-size:12px;color:var(--ink-faint)}
+  .langtog{display:inline-flex;border:1px solid var(--card-line);border-radius:999px;overflow:hidden;background:var(--card)}
+  .langtog button{appearance:none;background:transparent;border:0;color:var(--ink-dim);font:inherit;
+    font-size:13px;font-weight:600;padding:9px 14px;cursor:pointer;transition:background .15s,color .15s}
+  .langtog button.active{background:rgba(66,245,255,.16);color:var(--glow)}
+  /* language switch: render only the active language's copy */
+  html[lang="en"] [data-l="ja"]{display:none}
+  html[lang="ja"] [data-l="en"]{display:none}
+
+  /* ---------- generic card ---------- */
+  .card{background:var(--card);border:1px solid var(--card-line);border-radius:var(--r);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    box-shadow:0 8px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04)}
+
+  /* ---------- hero gauge ---------- */
+  .hero{margin:14px 0;padding:26px 22px;display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center}
+  @media(max-width:560px){.hero{grid-template-columns:1fr;text-align:center;justify-items:center;gap:14px;padding:22px 16px}
+    .chips{justify-content:center}}
+  .gauge{position:relative;width:172px;height:172px;flex:none}
+  .gauge svg{transform:rotate(-90deg);display:block}
+  .gauge .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .gauge .num{font-size:46px;font-weight:800;line-height:1;letter-spacing:-.02em}
+  .gauge .pct{font-size:13px;color:var(--ink-faint);margin-top:3px;letter-spacing:.1em}
+  .verdict .band{font-size:clamp(22px,5vw,30px);font-weight:800;line-height:1.1}
+  .verdict .band .jp{font-size:.66em;color:var(--ink-dim);font-weight:700;margin-left:.4em}
+  .verdict p{color:var(--ink-dim);font-size:14.5px;margin-top:8px;max-width:42ch}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .besttime{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;
+    background:rgba(66,245,255,.08);border:1px solid var(--card-line);font-size:13.5px;cursor:pointer;transition:background .15s;
+    flex-wrap:wrap;justify-content:center;max-width:100%}
+  .besttime:hover{background:rgba(66,245,255,.16)}
+  .besttime.easy{background:rgba(255,210,120,.1);border-color:rgba(255,210,120,.35)}
+  .besttime.easy:hover{background:rgba(255,210,120,.2)}
+  .besttime.easy b{color:#ffd27a}
+  .besttime.easy .lbl{color:rgba(255,210,120,.75)}
+  .besttime b{color:var(--glow);font-variant-numeric:tabular-nums}
+  .besttime .lbl{color:var(--ink-faint);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+
+  /* ---------- section heads ---------- */
+  .sec{margin:22px 0 10px;display:flex;align-items:baseline;gap:10px}
+  .sec h2{font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);font-weight:700}
+  .sec .jp{font-size:12px;color:var(--ink-faint)}
+
+  /* ---------- factor breakdown ---------- */
+  .factors{padding:8px 20px 16px}
+  .factor{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:14px 0;border-top:1px solid rgba(86,180,220,.1)}
+  .factor:first-child{border-top:0}
+  .factor .name{font-weight:700;font-size:15px}
+  .factor .name .jp{color:var(--ink-faint);font-weight:600;font-size:12.5px;margin-left:.5em}
+  .factor .read{font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink);text-align:right;font-weight:600}
+  .factor .note{grid-column:1/2;color:var(--ink-faint);font-size:12.5px}
+  .factor .barwrap{grid-column:2/3;width:104px;align-self:center}
+  .bar{height:7px;border-radius:99px;background:var(--bar-track);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:99px;transition:width .6s cubic-bezier(.2,.7,.2,1)}
+
+  /* ---------- 7-night strip ---------- */
+  .nights{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;padding:4px 2px}
+  @media(max-width:620px){.nights{grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:minmax(64px,1fr);
+    overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px;-webkit-overflow-scrolling:touch}}
+  .night{scroll-snap-align:start;background:var(--card);border:1px solid var(--card-line);border-radius:var(--r-sm);
+    padding:10px 6px 12px;text-align:center;cursor:pointer;transition:transform .15s,border-color .2s,background .2s}
+  .night:hover{transform:translateY(-2px)}
+  .night.active{border-color:var(--glow);background:rgba(66,245,255,.08);box-shadow:0 0 0 1px var(--glow)}
+  .night .dow{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em}
+  .night .date{font-size:13px;font-weight:700;margin:1px 0 8px}
+  .night .ring{width:42px;height:42px;margin:0 auto}
+  .night .ns{font-size:14px;font-weight:800;margin-top:6px;font-variant-numeric:tabular-nums}
+  .night .moon{font-size:13px;margin-top:2px;opacity:.85}
+
+  /* ---------- tide chart ---------- */
+  .chart{padding:18px 16px 12px}
+  .chart svg{width:100%;height:auto;display:block;overflow:visible}
+  .chartlegend{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:8px;font-size:12px;color:var(--ink-faint)}
+  .chartlegend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+
+  /* ---------- time scrubber ---------- */
+  .scrubber{padding:16px 18px 14px}
+  .scrub-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:4px}
+  .scrub-time{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
+  .scrub-time b{font-size:26px;font-weight:800;color:var(--glow);font-variant-numeric:tabular-nums;
+    text-shadow:0 0 18px rgba(66,245,255,.4)}
+  .scrub-time .jst{font-size:12px;color:var(--ink-faint);letter-spacing:.08em}
+  .scrub-time .seltag{font-size:11px;color:var(--ink-dim);background:rgba(66,245,255,.08);
+    border:1px solid var(--card-line);border-radius:999px;padding:2px 9px;margin-left:4px}
+  .snapbtn{background:rgba(43,212,196,.12);border:1px solid rgba(43,212,196,.4);color:var(--teal);
+    border-radius:999px;padding:7px 14px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+    white-space:nowrap;transition:background .15s}
+  .snapbtn:hover{background:rgba(43,212,196,.22)}
+  #scrubSvg{width:100%;height:96px;display:block;margin:2px 0 -6px}
+  input[type=range]#timeRange{-webkit-appearance:none;appearance:none;width:100%;height:26px;
+    background:transparent;cursor:pointer;margin:0}
+  #timeRange:disabled{opacity:.4;cursor:default}
+  #timeRange::-webkit-slider-runnable-track{height:4px;border-radius:99px;
+    background:linear-gradient(90deg,rgba(255,210,120,.5),rgba(66,245,255,.35),rgba(255,210,120,.5))}
+  #timeRange::-moz-range-track{height:4px;border-radius:99px;
+    background:linear-gradient(90deg,rgba(255,210,120,.5),rgba(66,245,255,.35),rgba(255,210,120,.5))}
+  #timeRange::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;margin-top:-9px;
+    width:22px;height:22px;border-radius:50%;background:var(--glow);border:3px solid #02060f;
+    box-shadow:0 0 12px var(--glow);cursor:grab}
+  #timeRange::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:var(--glow);
+    border:3px solid #02060f;box-shadow:0 0 12px var(--glow);cursor:grab}
+  #timeRange:active::-webkit-slider-thumb{cursor:grabbing}
+  .scrub-ends{display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--ink-faint)}
+  .scrub-ends b{color:var(--ink-dim);font-variant-numeric:tabular-nums;font-weight:700}
+  .snapbtn.alt{background:rgba(66,245,255,.1);border-color:var(--card-line);color:var(--glow)}
+  .snapbtn.alt:hover{background:rgba(66,245,255,.2)}
+
+  /* ---------- moon sensitivity ---------- */
+  .moonctl{padding:16px 18px 16px}
+  .moonctl-desc{font-size:13px;color:var(--ink-dim);margin-bottom:12px}
+  .moonctl-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-faint);
+    letter-spacing:.04em;margin-top:6px}
+  .moonctl-marker{position:relative;height:15px}
+  .moonctl-marker .tick{position:absolute;transform:translateX(-50%);font-size:10.5px;font-weight:600;
+    color:var(--teal);white-space:nowrap;letter-spacing:.02em;text-shadow:0 0 8px rgba(43,212,196,.4)}
+  #moonRange{-webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;cursor:pointer;margin:0}
+  #moonRange::-webkit-slider-runnable-track{height:4px;border-radius:99px;
+    background:linear-gradient(90deg,var(--glow),rgba(120,150,180,.4) 40%,rgba(255,240,205,.75))}
+  #moonRange::-moz-range-track{height:4px;border-radius:99px;
+    background:linear-gradient(90deg,var(--glow),rgba(120,150,180,.4) 40%,rgba(255,240,205,.75))}
+  #moonRange::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;margin-top:-9px;
+    width:22px;height:22px;border-radius:50%;background:var(--glow);border:3px solid #02060f;
+    box-shadow:0 0 12px var(--glow);cursor:grab}
+  #moonRange::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:var(--glow);
+    border:3px solid #02060f;box-shadow:0 0 12px var(--glow);cursor:grab}
+  .moonctl-foot{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:10px}
+  .moonctl-read{font-size:14px;color:var(--ink)}
+  .moonctl-read b{color:var(--glow)}
+  .moonctl-read .jp{font-size:12px;color:var(--ink-faint)}
+  .moonctl-read .sub{font-size:12px;color:var(--ink-faint);display:inline-block;margin-top:3px}
+  .moonctl-read .sub b{color:var(--ink-dim)}
+
+  /* ---------- methodology ---------- */
+  details{margin-top:16px;border-radius:var(--r)}
+  details summary{cursor:pointer;list-style:none;padding:16px 20px;font-weight:700;font-size:14px;
+    display:flex;justify-content:space-between;align-items:center}
+  details summary::-webkit-details-marker{display:none}
+  details summary .chev{color:var(--glow);transition:transform .2s}
+  details[open] summary .chev{transform:rotate(180deg)}
+  .method{padding:0 22px 22px;color:var(--ink-dim);font-size:14px}
+  .method h3{color:var(--ink);font-size:14px;margin:16px 0 6px;letter-spacing:.02em}
+  .method p{margin:6px 0}
+  .method ul{margin:6px 0 6px 18px}
+  .method li{margin:4px 0}
+  .method code{background:rgba(66,245,255,.08);padding:1px 6px;border-radius:6px;font-size:12.5px;color:var(--glow)}
+  .method a{color:var(--glow);text-decoration:none;border-bottom:1px solid rgba(66,245,255,.3)}
+  .wtable{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  .wtable td{padding:5px 8px;border-top:1px solid rgba(86,180,220,.12)}
+  .wtable td:last-child{text-align:right;color:var(--glow);font-variant-numeric:tabular-nums;font-weight:600}
+
+  footer{text-align:center;color:var(--ink-faint);font-size:12px;padding:26px 10px 12px;line-height:1.7}
+  footer a{color:var(--ink-dim)}
+
+  /* ---------- loading / error ---------- */
+  .status{padding:40px 20px;text-align:center;color:var(--ink-dim)}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(66,245,255,.2);
+    border-top-color:var(--glow);margin:0 auto 14px;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .btn{display:inline-block;margin-top:14px;background:rgba(66,245,255,.1);border:1px solid var(--card-line);
+    color:var(--glow);border-radius:999px;padding:10px 20px;font:inherit;font-weight:600;cursor:pointer}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="sparkles" id="sparkles"></div>
+    <div class="kicker"><span data-l="en">Bioluminescence Forecast</span><span data-l="ja">夜光虫の見頃予報</span></div>
+    <h1>Sea Sparkle Forecast<span class="jp">夜光虫よほう</span></h1>
+    <p class="sub"><span data-l="en">An educated guess at when the plankton are most likely to glow blue along the Shōnan coast — from live sea temperature, wind, waves, tide &amp; moonlight.</span><span data-l="ja">湘南の海で夜光虫が青く光るのはいつ頃か。海水温・風・波・潮の満ち引き・月明かりのリアルタイムデータから予測します。</span></p>
+
+    <div class="locbar">
+      <select id="locSel" aria-label="Location / 場所"></select>
+      <div class="langtog" id="langTog">
+        <button type="button" data-lang="en">EN</button>
+        <button type="button" data-lang="ja">日本語</button>
+      </div>
+      <span class="updated" id="updated"></span>
+    </div>
+  </header>
+
+  <!-- loading -->
+  <div class="card status" id="loading">
+    <div class="spinner"></div>
+    <div><span data-l="en">Reading the ocean…</span><span data-l="ja">海の様子を確認中…</span></div>
+  </div>
+
+  <!-- error -->
+  <div class="card status hidden" id="error">
+    <div id="errmsg"></div>
+    <button class="btn" onclick="boot()"><span data-l="en">Try again</span><span data-l="ja">もう一度</span></button>
+  </div>
+
+  <!-- main app -->
+  <main id="app" class="hidden">
+
+    <!-- hero gauge -->
+    <section class="card hero">
+      <div class="gauge" id="gauge">
+        <svg width="172" height="172" viewBox="0 0 172 172">
+          <defs>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="4" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <circle cx="86" cy="86" r="74" fill="none" stroke="rgba(120,160,190,.14)" stroke-width="13"/>
+          <circle id="gaugeArc" cx="86" cy="86" r="74" fill="none" stroke="var(--glow)" stroke-width="13"
+                  stroke-linecap="round" filter="url(#glow)"
+                  stroke-dasharray="464.96" stroke-dashoffset="464.96"/>
+        </svg>
+        <div class="val">
+          <div class="num" id="gNum">–</div>
+          <div class="pct">/ 100</div>
+        </div>
+      </div>
+      <div class="verdict">
+        <div class="band" id="vBand">—</div>
+        <p id="vText">Loading the forecast for tonight…</p>
+        <div class="chips">
+          <div class="besttime" id="bestWrap" title="Best window / 見頃">
+            <span class="lbl"><span data-l="en">Best window</span><span data-l="ja">見頃</span></span>
+            <b id="bestTime">—</b>
+            <span class="lbl">JST</span>
+          </div>
+          <div class="besttime easy hidden" id="easyWrap" title="A good earlier time most people can make / 多くの人が行ける早めの時間">
+            <span class="lbl"><span data-l="en">Catch it earlier</span><span data-l="ja">早めの見頃</span></span>
+            <b id="easyTime">—</b>
+            <span class="lbl">JST</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- time scrubber: pick any moment from sunset to sunrise -->
+    <div class="sec"><h2><span data-l="en">Pick a time</span><span data-l="ja">時刻で選ぶ</span></h2>
+      <span class="jp"><span data-l="en">sunset → sunrise</span><span data-l="ja">日没〜日の出</span></span></div>
+    <section class="card scrubber">
+      <div class="scrub-head">
+        <div class="scrub-time"><b id="selTime">—</b><span class="jst">JST</span>
+          <span class="seltag" id="selTag"></span></div>
+        <button class="snapbtn" id="snapBest"><span data-l="en">◎ Best window</span><span data-l="ja">◎ 見頃</span></button>
+      </div>
+      <svg id="scrubSvg" viewBox="0 0 720 120" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <input type="range" id="timeRange" min="0" max="0" value="0" step="1"
+             aria-label="Viewing time from sunset to sunrise" />
+      <div class="scrub-ends">
+        <span><span data-l="en">☀ Sunset</span><span data-l="ja">☀ 日没</span> <b id="sunsetLbl">—</b> JST</span>
+        <span>JST <b id="sunriseLbl">—</b> <span data-l="en">Sunrise ☀</span><span data-l="ja">日の出 ☀</span></span>
+      </div>
+    </section>
+
+    <!-- moon sensitivity: how much moonlight lowers the score -->
+    <div class="sec"><h2><span data-l="en">Moon sensitivity</span><span data-l="ja">月明かりの影響</span></h2></div>
+    <section class="card moonctl">
+      <p class="moonctl-desc">
+        <span data-l="en">How much a bright moon lowers the score. The marked point is the <em>forecasted</em> value — calibrated to real Shōnan sightings, where a dense bloom shows through moonlight. Slide right if you only chase pitch-dark nights, left to ignore the moon entirely.</span>
+        <span data-l="ja">明るい月がスコアをどれくらい下げるか。印が<em>予報値</em>です。濃い夜光虫なら月明かりの下でもよく見えるので、湘南で実際に見えた例に合わせて控えめに設定しています。真っ暗な夜だけ狙うなら右へ、月を気にしないなら左へ。</span>
+      </p>
+      <div class="moonctl-marker"><span class="tick" id="moonTick"><span data-l="en">Forecasted ▾</span><span data-l="ja">予報 ▾</span></span></div>
+      <input type="range" id="moonRange" class="glowrange" min="0" max="1" step="0.05" value="0.40"
+             aria-label="Moon sensitivity / 月明かりの感度" />
+      <div class="moonctl-scale">
+        <span><span data-l="en">Gentle</span><span data-l="ja">弱め</span></span>
+        <span><span data-l="en">Intense</span><span data-l="ja">強い</span></span>
+      </div>
+      <div class="moonctl-foot">
+        <span class="moonctl-read" id="moonRead">—</span>
+        <button class="snapbtn alt hidden" id="moonReset"><span data-l="en">↺ Forecasted</span><span data-l="ja">↺ 予報値に戻す</span></button>
+      </div>
+    </section>
+
+    <!-- factor breakdown -->
+    <div class="sec"><h2><span data-l="en">Why</span><span data-l="ja">理由</span></h2><span class="jp" id="factorDay"></span></div>
+    <section class="card factors" id="factors"></section>
+
+    <!-- 7 night strip -->
+    <div class="sec"><h2><span data-l="en">Next 7 nights</span><span data-l="ja">この先7日間</span></h2></div>
+    <section class="nights" id="nights"></section>
+
+    <!-- tide + light chart -->
+    <div class="sec"><h2><span data-l="en">Tide &amp; darkness</span><span data-l="ja">潮と暗さ</span></h2></div>
+    <section class="card chart">
+      <svg id="tideSvg" viewBox="0 0 720 220" preserveAspectRatio="none" aria-label="Tide curve / 潮位"></svg>
+      <div class="chartlegend">
+        <span><i class="dot" style="background:var(--glow)"></i><span data-l="en">Tide</span><span data-l="ja">潮位</span></span>
+        <span><i class="dot" style="background:rgba(40,70,110,.85)"></i><span data-l="en">Dark hours</span><span data-l="ja">暗い時間</span></span>
+        <span><i class="dot" style="background:var(--teal)"></i><span data-l="en">Selected time</span><span data-l="ja">選択時刻</span></span>
+      </div>
+    </section>
+
+    <!-- methodology -->
+    <details class="card">
+      <summary><span><span data-l="en">How this works &amp; how good the guess is</span><span data-l="ja">仕組みと精度について</span></span> <span class="chev">▾</span></summary>
+
+      <!-- English -->
+      <div class="method" data-l="en">
+        <p><strong>夜光虫 (yakōchū)</strong> is usually <em>Noctiluca scintillans</em> — a single-celled plankton that flashes blue when the water is disturbed. By day a dense bloom looks like a pinkish-brown "red tide"; after dark, waves and footsteps set it sparkling. You can't predict it with certainty — but the conditions that produce a visible glow are fairly consistent, so this page scores them.</p>
+        <h3>What pushes the odds up</h3>
+        <ul>
+          <li><strong>Warm sea (16–23&nbsp;°C)</strong> — Noctiluca blooms peak in late spring/early summer (and again in autumn). This is the single biggest driver, and it's why late May on Shōnan is prime time.</li>
+          <li><strong>Calm sea</strong> — the plankton float at the surface; big waves mix them down and scatter them. Flat water lets a bloom concentrate.</li>
+          <li><strong>Gentle onshore wind</strong> — wind blowing <em>from the sea toward the beach</em> herds the surface bloom against the shore where you can see it. Strong offshore wind blows it away.</li>
+          <li><strong>Darkness</strong> — this is about <em>seeing</em> it, not whether it's there. A new moon (or the moon below the horizon) makes a faint glow obvious; a bright moon dims the contrast — but a dense bloom is easily seen even under a gibbous moon (confirmed by local sightings), so moonlight is only a gentle penalty here. Cloud cover that hides the moon brings the darkness back.</li>
+          <li><strong>High / rising tide</strong> — anecdotally brings the surface bloom and its wave-action closer to the sand. Weak signal, so it's weighted lightly.</li>
+          <li><strong>A recent mild rain</strong> — a nutrient pulse a day or two before can feed a bloom; a heavy downpour right before tends to muddy and dilute the water.</li>
+        </ul>
+        <h3>The score</h3>
+        <p>For every 15 minutes from sunset to sunrise we combine the factors below into a 0–100 "presence" score, then multiply by how visible a glow would be — twilight is a hard gate (you can't see it before the sky is dark), the moon gently dims the contrast (a dense bloom still shows through, calibrated to real Shōnan sightings), and cloud cover that hides the moon brings the darkness back. The page opens on the night's <em>best window</em>, but you can drag the time picker to any moment between sunset and sunrise and watch the score move. The <strong>Moon sensitivity</strong> control lets you dial how much moonlight matters — it defaults to the <em>forecasted</em> value, marked on the slider at its true position. Weights (tunable in the code):</p>
+        <table class="wtable">
+          <tr><td>Sea-surface temperature</td><td>32%</td></tr>
+          <tr><td>Calm sea / low waves</td><td>24%</td></tr>
+          <tr><td>Onshore wind</td><td>24%</td></tr>
+          <tr><td>Tide state</td><td>10%</td></tr>
+          <tr><td>Recent rain / nutrients</td><td>10%</td></tr>
+          <tr><td>× Darkness (moon + twilight)</td><td>gate</td></tr>
+        </table>
+        <h3>Data sources (all live, no API key)</h3>
+        <ul>
+          <li>Sea temperature &amp; wave height — <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo Marine API</a></li>
+          <li>Wind, air temperature, rain, cloud — <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo Forecast API</a></li>
+          <li>Tide curve &amp; high/low times — <a href="https://tide736.net/" target="_blank" rel="noopener">tide736.net</a> (Japan Meteorological Agency harmonics)</li>
+          <li>Sun &amp; moon — SunCalc astronomy, computed in your browser</li>
+        </ul>
+        <h3>Honest caveats</h3>
+        <p>This is a probability nudge, not a promise. Blooms drift, patch up, and vanish on their own; the model can't see the plankton, only the weather around them. Treat a "High" night as <em>worth the walk to the beach</em>, not a guarantee. Tide is only available for Japanese locations; elsewhere that factor is dropped and the others re-weighted.</p>
+        <h3>Scaling to other places</h3>
+        <p>Each spot is one entry in the <code>LOCATIONS</code> array near the top of the script: name, latitude/longitude, the compass bearing the beach faces (for the onshore-wind math), and an optional Japanese tide station <code>{pc, hc}</code>. Add a row and it appears in the menu — the weather, sun and moon work anywhere on Earth.</p>
+      </div>
+
+      <!-- 日本語 -->
+      <div class="method" data-l="ja">
+        <p><strong>夜光虫（やこうちゅう）</strong>の多くは <em>Noctiluca scintillans</em> という単細胞のプランクトンで、水が動くと青く光ります。昼に大量発生すると赤茶色の「赤潮」のように見え、夜は波や足音で光ります。確実な予測はできませんが、よく光って見える条件はだいたい決まっているので、このページではそれを点数にしています。</p>
+        <h3>光って見えやすい条件</h3>
+        <ul>
+          <li><strong>暖かい海（16〜23&nbsp;℃）</strong>。夜光虫は晩春から初夏（と秋）にいちばん増えます。これが最大の要因で、5月下旬の湘南がまさに最盛期なのもそのためです。</li>
+          <li><strong>穏やかな海</strong>。夜光虫は水面に浮かんでいるので、波が高いと沈んで散ってしまいます。海が凪いでいるほど濃く集まります。</li>
+          <li><strong>弱い海風</strong>。<em>海から浜へ</em>吹く風は、水面の夜光虫を岸際に寄せてくれて見やすくなります。強い沖向きの風は逆に沖へ流してしまいます。</li>
+          <li><strong>暗さ</strong>。これは「見えるか」の話で、いるかどうかとは別です。新月や月が沈んでいる時間なら淡い光もはっきり見え、明るい月があると見えにくくなります。ただし濃い夜光虫なら半月〜十三夜くらいの月でも十分見える（地元での目撃でも確認済み）ので、ここでの月の減点は控えめにしています。雲が月を隠せば、また暗くなります。</li>
+          <li><strong>満潮・上げ潮</strong>。経験的に、水面の夜光虫や波の動きを砂浜に近づけると言われます。根拠は弱いので重みは小さめです。</li>
+          <li><strong>少し前のひと雨</strong>。1〜2日前の雨は栄養になって夜光虫を増やすことがありますが、直前の大雨は水を濁らせて薄めてしまいます。</li>
+        </ul>
+        <h3>スコアの仕組み</h3>
+        <p>日没から日の出まで15分ごとに、下の各要因を0〜100の「いそうかどうか」スコアにまとめ、それに「見えやすさ」を掛けます。薄明はきっぱりした境目で（空が暗くなる前は見えません）、月はコントラストを少しだけ下げ（濃ければ見える。湘南で実際に見えた例に合わせています）、月を隠す雲があればまた暗くなります。ページは最初その夜の<em>見頃</em>を表示しますが、時刻スライダーを日没〜日の出のどの時刻に動かしてもスコアが変わります。<strong>月明かりの影響</strong>では月の効き具合を調整でき、標準は<em>予報値</em>（スライダー上の実際の位置に印）です。重み（コードで調整できます）：</p>
+        <table class="wtable">
+          <tr><td>海水温</td><td>32%</td></tr>
+          <tr><td>海の穏やかさ（波の低さ）</td><td>24%</td></tr>
+          <tr><td>海からの風</td><td>24%</td></tr>
+          <tr><td>潮位</td><td>10%</td></tr>
+          <tr><td>最近の雨・栄養</td><td>10%</td></tr>
+          <tr><td>× 暗さ（月＋薄明）</td><td>かけ算</td></tr>
+        </table>
+        <h3>データの出どころ（すべてライブ、APIキー不要）</h3>
+        <ul>
+          <li>海水温・波の高さ — <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo Marine API</a></li>
+          <li>風・気温・雨・雲 — <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo Forecast API</a></li>
+          <li>潮位カーブ・満潮干潮の時刻 — <a href="https://tide736.net/" target="_blank" rel="noopener">tide736.net</a>（気象庁の調和定数）</li>
+          <li>太陽・月 — SunCalc（ブラウザの中で計算）</li>
+        </ul>
+        <h3>正直なところ</h3>
+        <p>これはあくまで確率のあと押しで、保証ではありません。夜光虫は漂って、集まって、勝手に消えます。このモデルは夜光虫そのものは見ておらず、まわりの気象しか見ていません。「高い」の夜も確実ではなく、<em>浜まで行ってみる価値あり</em>くらいに思ってください。潮位は日本の地点だけで、それ以外では潮位を外して残りの要因で重みを配分し直します。</p>
+        <h3>他の場所に広げるには</h3>
+        <p>各スポットはスクリプト冒頭の <code>LOCATIONS</code> 配列の1行です。名前、緯度経度、浜が向いている方角（海風の計算用）、それと日本なら潮位の観測点 <code>{pc, hc}</code>。1行足せばメニューに出てきます。気象・太陽・月は世界中どこでも動きます。</p>
+      </div>
+    </details>
+
+    <footer>
+      <div id="foot"></div>
+      <div><span data-l="en">Made for the Shōnan coast · An educated guess, not a guarantee.</span><span data-l="ja">湘南の夜のために · 確実な予報ではなく、あくまでも目安です。</span></div>
+    </footer>
+  </main>
+</div>
+
+<script>
+/* ==========================================================================
+   夜光虫 / Sea Sparkle Forecast
+   Single-file, no build, no API keys. Open in any browser.
+   ========================================================================== */
+
+/* ---- 1. LOCATIONS — add a row to scale anywhere ----
+   shoreFacing = compass bearing (deg) the beach OPENS toward (seaward normal).
+                 Onshore wind blows FROM this bearing. Shōnan beaches ≈ south.
+   tide = {pc, hc} tide736.net station (Japan only); null elsewhere.        */
+const LOCATIONS = [
+  { id:'enoshima', nameEn:'Enoshima · Katase', nameJp:'江の島・片瀬',
+    lat:35.309, lon:139.481, shoreFacing:185, tide:{pc:14,hc:19},
+    note:'Katase-Nishihama, facing Sagami Bay.' },
+  { id:'kamakura', nameEn:'Kamakura · Yuigahama', nameJp:'鎌倉・由比ヶ浜',
+    lat:35.305, lon:139.545, shoreFacing:178, tide:{pc:14,hc:19} },
+  { id:'chigasaki', nameEn:'Chigasaki · Southern Beach', nameJp:'茅ヶ崎・サザン',
+    lat:35.317, lon:139.404, shoreFacing:190, tide:{pc:14,hc:19} },
+  { id:'zushi', nameEn:'Zushi Beach', nameJp:'逗子海岸',
+    lat:35.290, lon:139.580, shoreFacing:205, tide:{pc:14,hc:19} },
+  { id:'hayama', nameEn:'Hayama · Isshiki', nameJp:'葉山・一色',
+    lat:35.268, lon:139.585, shoreFacing:240, tide:{pc:14,hc:16} }
+];
+
+/* ---- 2. MODEL WEIGHTS (presence). Visibility is applied as a multiplier. ---- */
+const W = { sst:0.32, wave:0.24, wind:0.24, tide:0.10, rain:0.10 };
+// How hard the moon dims things: a clear full moon high overhead removes up to
+// (MOON_DIM) of the visibility. Calibrated against real sightings on the Shōnan
+// coast under a bright gibbous moon — a dense bloom punches through moonlight, so
+// this is deliberately gentle. Cloud cover (below) blocks the moon further.
+// User-adjustable in the UI; MOON_DIM_DEFAULT is the "forecasted" calibrated value.
+const MOON_DIM_DEFAULT = 0.40;
+let MOON_DIM = MOON_DIM_DEFAULT;
+
+/* ---- 3. SunCalc (trimmed) — sun & moon position/illumination, public domain.
+   Vladimir Agafonkin, https://github.com/mourner/suncalc ---- */
+const SunCalc=(function(){
+  const PI=Math.PI,sin=Math.sin,cos=Math.cos,tan=Math.tan,asin=Math.asin,
+        atan=Math.atan2,acos=Math.acos,rad=PI/180,
+        dayMs=864e5,J1970=2440588,J2000=2451545,e=rad*23.4397;
+  const toJulian=d=>d.valueOf()/dayMs-0.5+J1970;
+  const toDays=d=>toJulian(d)-J2000;
+  const ra=(l,b)=>atan(sin(l)*cos(e)-tan(b)*sin(e),cos(l));
+  const dec=(l,b)=>asin(sin(b)*cos(e)+cos(b)*sin(e)*sin(l));
+  const sidereal=(d,lw)=>rad*(280.16+360.9856235*d)-lw;
+  const altitude=(H,phi,d)=>asin(sin(phi)*sin(d)+cos(phi)*cos(d)*cos(H));
+  const solarMeanAnomaly=d=>rad*(357.5291+0.98560028*d);
+  const eclipticLongitude=M=>{const C=rad*(1.9148*sin(M)+0.02*sin(2*M)+0.0003*sin(3*M));return M+C+rad*102.9372+PI;};
+  function sunCoords(d){const M=solarMeanAnomaly(d),L=eclipticLongitude(M);return{dec:dec(L,0),ra:ra(L,0)};}
+  function moonCoords(d){
+    const L=rad*(218.316+13.176396*d),M=rad*(134.963+13.064993*d),F=rad*(93.272+13.229350*d),
+          l=L+rad*6.289*sin(M),b=rad*5.128*sin(F),dt=385001-20905*cos(M);
+    return{ra:ra(l,b),dec:dec(l,b),dist:dt};
+  }
+  return {
+    sunAltitude(date,lat,lng){const lw=rad*-lng,phi=rad*lat,d=toDays(date),c=sunCoords(d),
+      H=sidereal(d,lw)-c.ra;return altitude(H,phi,c.dec)/rad;}, // degrees
+    moonAltitude(date,lat,lng){const lw=rad*-lng,phi=rad*lat,d=toDays(date),c=moonCoords(d),
+      H=sidereal(d,lw)-c.ra,h=altitude(H,phi,c.dec);return h/rad;}, // degrees (approx, no parallax)
+    moonFraction(date){const d=toDays(date),s=sunCoords(d),m=moonCoords(d),sdist=149598000,
+      phi=acos(sin(s.dec)*sin(m.dec)+cos(s.dec)*cos(m.dec)*cos(s.ra-m.ra)),
+      inc=atan(sdist*sin(phi),m.dist-sdist*cos(phi));return (1+cos(inc))/2;},
+    moonPhase(date){ // 0=new .25=first qtr .5=full .75=last qtr
+      const d=toDays(date),s=sunCoords(d),m=moonCoords(d),sdist=149598000,
+        phi=acos(sin(s.dec)*sin(m.dec)+cos(s.dec)*cos(m.dec)*cos(s.ra-m.ra)),
+        inc=atan(sdist*sin(phi),m.dist-sdist*cos(phi)),
+        angle=atan(cos(s.dec)*sin(s.ra-m.ra),sin(s.dec)*cos(m.dec)-cos(s.dec)*sin(m.dec)*cos(s.ra-m.ra));
+      return 0.5+0.5*inc*(angle<0?-1:1)/PI;}
+  };
+})();
+
+/* ---- 4. tiny helpers ---- */
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const lerp=(a,b,t)=>a+(b-a)*t;
+// trapezoid: 0 below a, ramp a→b, 1 between b..c, ramp c→d, 0 above d
+function trap(x,a,b,c,d){
+  if(x<=a||x>=d)return 0;
+  if(x<b)return (x-a)/(b-a);
+  if(x<=c)return 1;
+  return (d-x)/(d-c);
+}
+const MOON_EMOJI=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'];
+const moonEmoji=ph=>MOON_EMOJI[Math.floor((ph*8)+0.5)%8];
+const pad=n=>String(n).padStart(2,'0');
+function jstDate(d){ // Date -> {y,m,d} in Asia/Tokyo
+  const p=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'})
+    .formatToParts(d).reduce((o,x)=>(o[x.type]=x.value,o),{});
+  return {y:+p.year,m:+p.month,d:+p.day};
+}
+// 24-hour clock, always in Japan Standard Time
+const fmtTime=d=>(d instanceof Date?d:new Date(d))
+  .toLocaleTimeString('en-GB',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+const fmtJST=d=>fmtTime(d)+' JST';
+const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DOW_JA=['日','月','火','水','木','金','土'];
+
+/* ---- language: default to the browser, remember an explicit choice ---- */
+let LANG=(()=>{ try{const s=localStorage.getItem('yk-lang'); if(s==='en'||s==='ja')return s;}catch(e){}
+  return (navigator.language||'en').toLowerCase().startsWith('ja')?'ja':'en'; })();
+const L=(en,ja)=>LANG==='ja'?ja:en;          // pick the active-language string
+const dowName=g=>(LANG==='ja'?DOW_JA:DOW)[g];
+
+/* ---- 5. score → band ---- */
+const BANDS=[
+  {min:80,en:'Very High',jp:'非常に高い',col:'#5dffff',
+   txt:'Conditions are about as good as they get. Worth heading down to dark, calm water tonight.',
+   txtJa:'条件はほぼ最高です。暗くて穏やかな海へ出かける価値あり。'},
+  {min:60,en:'High',jp:'高い',col:'#34f5ff',
+   txt:'A genuinely promising night — warm, calm and dark enough that a glow is likely if a bloom is around.',
+   txtJa:'かなり期待できる夜。水温・凪・暗さが揃い、発生していれば光って見えるはず。'},
+  {min:40,en:'Moderate',jp:'まずまず',col:'#2bb6c9',
+   txt:'A real chance, but not a sure thing. Best near the peak window, away from streetlights.',
+   txtJa:'可能性は十分ありますが確実ではありません。見頃の時間帯に、街灯を避けて。'},
+  {min:20,en:'Low',jp:'低い',col:'#4d8fb0',
+   txt:'The odds are slim tonight — one or two factors are working against a visible glow.',
+   txtJa:'今夜は条件がいまいち。光が見えづらいかもしれません。'},
+  {min:0, en:'Very Low',jp:'ほぼ無し',col:'#5b6b8c',
+   txt:'Don’t count on it tonight. Check back when the sea is warmer, calmer or the moon is dimmer.',
+   txtJa:'今夜は期待薄。水温が上がって海が穏やかな、月の暗い夜にまた見てみてください。'}
+];
+const band=s=>BANDS.find(b=>s>=b.min);
+
+/* ============================ DATA FETCH ============================ */
+async function fetchJSON(url){
+  const r=await fetch(url);
+  if(!r.ok) throw new Error('HTTP '+r.status+' for '+url);
+  return r.json();
+}
+
+async function loadData(loc){
+  const t=jstDate(new Date());
+  const base=`latitude=${loc.lat}&longitude=${loc.lon}&timezone=Asia%2FTokyo&forecast_days=7`;
+  const fxURL=`https://api.open-meteo.com/v1/forecast?${base}&hourly=temperature_2m,wind_speed_10m,wind_direction_10m,precipitation,cloud_cover`;
+  const mxURL=`https://marine-api.open-meteo.com/v1/marine?${base}&hourly=sea_surface_temperature,wave_height`;
+  const reqs=[fetchJSON(fxURL),fetchJSON(mxURL)];
+  if(loc.tide) reqs.push(
+    fetchJSON(`https://tide736.net/api/get_tide.php?pc=${loc.tide.pc}&hc=${loc.tide.hc}&yr=${t.y}&mn=${t.m}&dy=${t.d}&rg=week`)
+      .catch(()=>null) // tide is optional; don't fail the whole page
+  );
+  const [fx,mx,td]=await Promise.all(reqs);
+
+  // merge hourly weather by ISO key "YYYY-MM-DDTHH:00"
+  const H={};
+  fx.hourly.time.forEach((iso,i)=>{
+    H[iso]={iso,
+      temp:fx.hourly.temperature_2m[i],
+      windSpd:fx.hourly.wind_speed_10m[i],
+      windDir:fx.hourly.wind_direction_10m[i],
+      precip:fx.hourly.precipitation[i],
+      cloud:fx.hourly.cloud_cover[i]};
+  });
+  mx.hourly.time.forEach((iso,i)=>{
+    if(!H[iso])H[iso]={iso};
+    H[iso].sst=mx.hourly.sea_surface_temperature[i];
+    H[iso].wave=mx.hourly.wave_height[i];
+  });
+
+  // tide: flatten all 20-min samples into one sorted [{t:ms,cm}] + per-day flood/edd
+  let tideSamples=[], tideDays={};
+  if(td && td.tide && td.tide.chart){
+    for(const [day,c] of Object.entries(td.tide.chart)){
+      (c.tide||[]).forEach(s=>tideSamples.push({t:s.unix,cm:s.cm}));
+      tideDays[day]={flood:c.flood||[],edd:c.edd||[],moonTitle:(c.moon&&c.moon.title)||null};
+    }
+    tideSamples.sort((a,b)=>a.t-b.t);
+  }
+  return {loc,H,tideSamples,tideDays,hasTide:tideSamples.length>0};
+}
+
+/* interpolate tide cm at a given ms timestamp */
+function tideAt(samples,ms){
+  if(!samples.length) return null;
+  if(ms<=samples[0].t) return samples[0].cm;
+  if(ms>=samples[samples.length-1].t) return samples[samples.length-1].cm;
+  let lo=0,hi=samples.length-1;
+  while(hi-lo>1){const mid=(lo+hi)>>1; if(samples[mid].t<=ms){lo=mid;}else{hi=mid;}}
+  const a=samples[lo],b=samples[hi];
+  return lerp(a.cm,b.cm,(ms-a.t)/(b.t-a.t));
+}
+
+/* ============================ SCORING ============================ */
+// sub-scores all return 0..1
+function sstScore(c){ return c==null?0.4:trap(c,13,17,23,27); }
+function waveScore(m){ if(m==null)return 0.5; return clamp(trap(m,-1,0,0.35,2.2)); } // <0.35m ideal, >2.2 dead
+function windScore(dir,spd,facing){
+  if(spd==null||dir==null)return 0.5;
+  if(spd<3) return 0.5;                       // dead calm: neutral, bloom not pushed anywhere
+  const onshore=Math.cos((dir-facing)*Math.PI/180);   // 1 = straight onshore, -1 = offshore
+  const directional=clamp((onshore+1)/2);             // 0..1
+  const speedEnv=trap(spd,0,7,20,42);                 // gentle→moderate breeze ideal
+  return clamp(0.15+0.85*directional)*clamp(0.4+0.6*speedEnv);
+}
+function tideScore(cm,dayMin,dayMax,rising){
+  if(cm==null||dayMax==null||dayMax<=dayMin)return 0.5;
+  const norm=clamp((cm-dayMin)/(dayMax-dayMin));      // 0 low .. 1 high
+  return clamp(0.55*norm+0.45*(rising?1:0.25));       // favor high & rising
+}
+function rainScore(prev48,now){
+  // mild recent rain = nutrient pulse (good); heavy/current rain = murk (bad)
+  let s=0.55;
+  if(prev48>=2 && prev48<=25) s=0.8;
+  else if(prev48>25 && prev48<=60) s=0.5;
+  else if(prev48>60) s=0.3;
+  if(now>0.3) s=Math.min(s,0.4);                      // raining now: muddier water + you'll get wet
+  return s;
+}
+// visibility 0..1 — can you actually SEE a glow right now?
+//  twilight: hard gate (0 in daylight → 1 once the sky is astronomically dark)
+//  moonDim : a bright high moon washes it out, but never to zero (dense blooms show);
+//            cloud cover hides the moon and brings the darkness back.
+function visibility(date,lat,lon,cloud=0){
+  const sun=SunCalc.sunAltitude(date,lat,lon);
+  const twilight=clamp(-sun/12);                      // 0° = sunset, -12° = dark
+  if(twilight<=0) return {vis:0,twilight:0,glare:0,moonDim:1,moonAlt:0,moonFrac:SunCalc.moonFraction(date),cloud};
+  const mAlt=SunCalc.moonAltitude(date,lat,lon);
+  const mFrac=SunCalc.moonFraction(date);
+  // ramp moon glare through the horizon (not a cliff at 0°): a bright moon
+  // near/over the horizon still lights the sky; a moon well below it doesn't.
+  let glare=mFrac*clamp((mAlt+4)/16);
+  glare*=(1-0.85*clamp(cloud/100));                   // overcast sky blocks the moon
+  const moonDim=clamp(1-MOON_DIM*glare);              // glare is MOON_DIM-independent → cheap to re-score
+  return {vis:twilight*moonDim, twilight, glare, moonDim, moonAlt:mAlt, moonFrac:mFrac, cloud};
+}
+
+// find the ms timestamp where the sun crosses the horizon between two times.
+// dir=-1 → sunset (descending through 0°); dir=+1 → sunrise (ascending).
+function sunCrossing(lat,lon,fromMs,toMs,dir){
+  let prev=SunCalc.sunAltitude(new Date(fromMs),lat,lon);
+  for(let ms=fromMs+60e3; ms<=toMs; ms+=60e3){
+    const a=SunCalc.sunAltitude(new Date(ms),lat,lon);
+    if(dir<0 && prev>0 && a<=0) return ms;
+    if(dir>0 && prev<0 && a>=0) return ms;
+    prev=a;
+  }
+  return null;
+}
+
+// best window(s) = every contiguous run within 90% of the night's peak. A night can
+// be bimodal (good after dark, a moon-dimmed trough, then good again after moonset),
+// so we keep ALL the good runs — more honest than one minute or one false-wide range.
+function computeWindows(n){
+  n.windows=[];
+  if(!n.best||!n.curve.length) return;
+  const thr=n.best.score*0.9;
+  let lo=-1;
+  n.curve.forEach((p,i)=>{
+    if(p.score>=thr){ if(lo<0) lo=i; }
+    else if(lo>=0){ n.windows.push({lo,hi:i-1}); lo=-1; }
+  });
+  if(lo>=0) n.windows.push({lo,hi:n.curve.length-1});
+  // "catch it earlier": when the peak sits in a LATER window, point to the earliest
+  // window's own local peak — a genuinely good time most people can actually make.
+  n.easyIdx=null;
+  if(n.windows.length){
+    const bi=n.curve.indexOf(n.best), first=n.windows[0];
+    if(bi<first.lo||bi>first.hi){
+      let pi=first.lo;
+      for(let i=first.lo;i<=first.hi;i++) if(n.curve[i].score>n.curve[pi].score) pi=i;
+      n.easyIdx=pi;
+    }
+  }
+}
+function inAnyWindow(n,idx){ return (n.windows||[]).some(w=>idx>=w.lo&&idx<=w.hi); }
+function windowLabel(n){
+  if(!n.windows||!n.windows.length) return '—';
+  return n.windows.map(w=>{ const a=fmtTime(n.curve[w.lo].dt), b=fmtTime(n.curve[w.hi].dt);
+    return w.lo===w.hi?a:`${a}–${b}`; }).join('  ·  ');
+}
+
+/* build one night's model for calendar date {y,m,d} (local JST night) */
+function buildNight(data,y,m,d){
+  const loc=data.loc, H=data.H;
+  const dayKey=`${y}-${pad(m)}-${pad(d)}`;
+  // previous 48h rainfall (sum precip for hours before 18:00 of this day)
+  let prev48=0;
+  const anchor=new Date(`${dayKey}T18:00:00+09:00`).getTime();
+  for(const iso in H){
+    const ts=new Date(iso+':00+09:00').getTime();
+    if(ts<=anchor && ts>anchor-48*3600e3 && H[iso].precip!=null) prev48+=H[iso].precip;
+  }
+  // tide day range for tideScore normalisation
+  let dayMin=Infinity,dayMax=-Infinity;
+  if(data.hasTide){
+    for(const s of data.tideSamples){
+      const sd=jstDate(new Date(s.t));
+      if(sd.y===y&&sd.m===m&&sd.d===d){dayMin=Math.min(dayMin,s.cm);dayMax=Math.max(dayMax,s.cm);}
+    }
+  }
+  // sunset (evening of D) → sunrise (morning of D+1), for THIS location
+  const noonMs=new Date(`${dayKey}T12:00:00+09:00`).getTime();
+  const sunsetMs =sunCrossing(loc.lat,loc.lon, noonMs+3*3600e3,  noonMs+11*3600e3, -1); // 15:00→23:00
+  const sunriseMs=sunCrossing(loc.lat,loc.lon, (sunsetMs||noonMs)+3*3600e3, noonMs+22*3600e3, +1); // →10:00 next
+
+  // build the score curve across the whole night, every 15 minutes
+  const curve=[];
+  if(sunsetMs && sunriseMs){
+    for(let ms=sunsetMs; ms<=sunriseMs; ms+=15*60e3){
+      const dt=new Date(ms);
+      const isoHour=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',
+        day:'2-digit',hour:'2-digit',hourCycle:'h23'}).format(dt).replace(' ','T')+':00'; // "YYYY-MM-DDTHH:00"
+      const h=H[isoHour]; if(!h) continue;
+      const v=visibility(dt,loc.lat,loc.lon,h.cloud||0);
+      const cm=data.hasTide?tideAt(data.tideSamples,ms):null;
+      const cmPrev=data.hasTide?tideAt(data.tideSamples,ms-3600e3):null;
+      const rising=cm!=null&&cmPrev!=null?cm>cmPrev:false;
+      const sub={
+        sst:sstScore(h.sst),
+        wave:waveScore(h.wave),
+        wind:windScore(h.windDir,h.windSpd,loc.shoreFacing),
+        tide:data.hasTide?tideScore(cm,dayMin,dayMax,rising):null,
+        rain:rainScore(prev48,h.precip||0)
+      };
+      let wsum=0,acc=0;                                 // presence = weighted avg (re-normalise if no tide)
+      for(const k of ['sst','wave','wind','tide','rain']){ if(sub[k]==null)continue; acc+=sub[k]*W[k]; wsum+=W[k]; }
+      const presence=acc/wsum;
+      curve.push({ms,dt,score:presence*v.vis*100,vis:v.vis,twilight:v.twilight,glare:v.glare,presence,sub,
+        env:{sst:h.sst,wave:h.wave,windDir:h.windDir,windSpd:h.windSpd,cloud:h.cloud,
+             cm,rising,moonFrac:v.moonFrac,moonPh:SunCalc.moonPhase(dt),moonAlt:v.moonAlt,prev48}});
+    }
+  }
+  let best=null;                                        // best = highest-scoring step of the night
+  for(const c of curve){ if(!best||c.score>best.score) best=c; }
+  const moonTitle=(data.tideDays[dayKey]||{}).moonTitle;
+  const night={y,m,d,dayKey,curve,best,sunsetMs,sunriseMs,moonTitle,hasTide:data.hasTide,
+          dayMin:isFinite(dayMin)?dayMin:null,dayMax:isFinite(dayMax)?dayMax:null};
+  computeWindows(night);
+  return night;
+}
+
+/* ============================ RENDER ============================ */
+let DATA=null, NIGHTS=[], SELECTED=0, SEL_I=0, CHART_CTX=null;
+
+function setGauge(score){
+  const C=2*Math.PI*74, b=band(score);
+  const arc=document.getElementById('gaugeArc');
+  arc.style.stroke=b.col;
+  arc.style.strokeDashoffset=C*(1-score/100);
+  document.documentElement.style.setProperty('--glow',b.col);
+  document.getElementById('gNum').textContent=Math.round(score);
+  document.getElementById('gNum').style.color=b.col;
+  document.getElementById('gNum').style.textShadow=`0 0 24px ${b.col}88`;
+  document.getElementById('vBand').textContent=LANG==='ja'?b.jp:b.en;
+  document.getElementById('vText').textContent=LANG==='ja'?b.txtJa:b.txt;
+}
+
+function compassName(dir){
+  const names=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return names[Math.round(dir/22.5)%16];
+}
+function barColor(s){return band(s*100).col;}
+
+function renderFactors(entry,night){
+  const el=document.getElementById('factors');
+  if(!entry){el.innerHTML=`<div class="status">${L('No data for this night.','この夜のデータがありません。')}</div>`;return;}
+  const e=entry.env, s=entry.sub, vis=entry.vis;
+  const windOn=Math.cos((e.windDir-DATA.loc.shoreFacing)*Math.PI/180);
+  const windWord=windOn>0.35?L('onshore','海から'):windOn<-0.35?L('offshore','沖へ'):L('cross-shore','横風');
+  const range=night.dayMax-night.dayMin;
+  const tideWord=e.cm==null?'—':
+     (night.dayMax-e.cm)<range*0.33?L('high','満潮寄り'):
+     (e.cm-night.dayMin)<range*0.33?L('low','干潮寄り'):L('mid','中間');
+  const noData=L('no data','データなし');
+  const rows=[
+    {name:L('Sea temperature','海水温'),read:e.sst==null?'—':e.sst.toFixed(1)+'°C',sc:s.sst,
+     note:e.sst==null?noData:e.sst<16?L('cool — blooms thin out','水温が低め。夜光虫は少なめ'):e.sst>24?L('warm — past Noctiluca’s peak','水温が高め。ピークは過ぎ気味'):L('in the bloom’s sweet spot','ちょうどいい水温')},
+    {name:L('Calm sea','波'),read:e.wave==null?'—':e.wave.toFixed(2)+'m',sc:s.wave,
+     note:e.wave==null?noData:e.wave<0.4?L('glassy — ideal','べた凪。理想的'):e.wave<1?L('a little chop','少し波あり'):L('rough — disperses the bloom','波が高くて散りやすい')},
+    {name:L('Onshore wind','風'),read:e.windSpd==null?'—':`${Math.round(e.windSpd)} km/h ${compassName(e.windDir)}`,sc:s.wind,
+     note:`${windWord}${e.windSpd<3?L(' · near calm',' · ほぼ無風'):''}`},
+    {name:L('Darkness & moon','暗さ・月'),
+     read:`${moonEmoji(e.moonPh)} ${Math.round(e.moonFrac*100)}% ${e.moonAlt<0?L('· set','· 沈'):L('· up','· 出')}${e.cloud>50?` · ☁${Math.round(e.cloud)}%`:''}`,sc:vis,
+     note:vis>0.8?(e.moonAlt<0?L('moon down — properly dark','月が沈んでいてしっかり暗い'):e.cloud>60?L('moon up but clouded over — still dark','月は出てるけど雲に隠れて暗い'):L('properly dark — glow shows well','しっかり暗くてよく見える'))
+          :vis>0.5?L('moonlight dims it a little','月明かりで少し見えにくい'):vis>0.15?L('bright moon — but a dense bloom shows through','月は明るいけど、濃ければ見える'):L('lots of moonlight — only a strong bloom will show','月明かりが強い。よほど濃くないと厳しい')},
+  ];
+  if(night.hasTide) rows.push(
+    {name:L('Tide','潮位'),read:e.cm==null?'—':`${Math.round(e.cm)}cm ${e.rising?'↑':'↓'}`,sc:s.tide,
+     note:`${tideWord}${e.rising?L(' · rising',' · 上げ'):L(' · falling',' · 下げ')}${night.moonTitle?' · '+night.moonTitle:''}`});
+  rows.push(
+    {name:L('Recent rain','最近の雨'),read:e.prev48.toFixed(1)+'mm',sc:s.rain,
+     note:e.prev48<2?L('dry — neutral','雨なし。影響なし'):e.prev48<=25?L('light rain lately — nutrient pulse','最近ひと雨。栄養になりそう'):L('heavy rain — may muddy the water','強い雨。水が濁るかも')});
+
+  el.innerHTML=rows.map(r=>{
+    const pct=Math.round(r.sc*100), col=barColor(r.sc);
+    return `<div class="factor">
+      <div class="name">${r.name}</div>
+      <div class="read">${r.read}</div>
+      <div class="note">${r.note}</div>
+      <div class="barwrap"><div class="bar"><i style="width:${pct}%;background:${col};box-shadow:0 0 8px ${col}99"></i></div></div>
+    </div>`;
+  }).join('');
+}
+
+function miniRing(score){
+  const b=band(score),C=2*Math.PI*16;
+  return `<svg class="ring" viewBox="0 0 42 42" style="transform:rotate(-90deg)">
+    <circle cx="21" cy="21" r="16" fill="none" stroke="rgba(120,160,190,.16)" stroke-width="4"/>
+    <circle cx="21" cy="21" r="16" fill="none" stroke="${b.col}" stroke-width="4" stroke-linecap="round"
+      stroke-dasharray="${C}" stroke-dashoffset="${C*(1-score/100)}"/></svg>`;
+}
+
+function renderNights(){
+  const el=document.getElementById('nights');
+  el.innerHTML=NIGHTS.map((n,i)=>{
+    const sc=n.best?n.best.score:0, b=band(sc);
+    const dt=new Date(`${n.dayKey}T12:00:00+09:00`);
+    const ph=n.best?moonEmoji(n.best.env.moonPh):'';
+    return `<div class="night ${i===SELECTED?'active':''}" data-i="${i}">
+      <div class="dow">${dowName(dt.getDay())}${i===0?L(' ·tonight',' ·今夜'):''}</div>
+      <div class="date">${n.m}/${n.d}</div>
+      ${miniRing(sc)}
+      <div class="ns" style="color:${b.col}">${Math.round(sc)}</div>
+      <div class="moon">${ph}</div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.night').forEach(c=>c.onclick=()=>select(+c.dataset.i));
+}
+
+function renderChart(night){
+  const svg=document.getElementById('tideSvg');
+  const W0=720,H0=220,padL=4,padR=4,padT=14,padB=22;
+  // gather this night's window samples (18:00 day → 06:00 next) for tide curve
+  const startMs=new Date(`${night.dayKey}T15:00:00+09:00`).getTime();
+  const endMs=startMs+15*3600e3; // 15:00 → 06:00 next day
+  let pts=[];
+  if(night.hasTide){
+    pts=DATA.tideSamples.filter(s=>s.t>=startMs&&s.t<=endMs);
+  }
+  if(pts.length<2){
+    svg.innerHTML=`<text x="${W0/2}" y="${H0/2}" fill="var(--ink-faint)" font-size="14" text-anchor="middle">${L('Tide data unavailable for this location.','この地点の潮位データはありません。')}</text>`;
+    return;
+  }
+  const cmMin=Math.min(...pts.map(p=>p.cm)), cmMax=Math.max(...pts.map(p=>p.cm));
+  const X=t=>padL+(t-startMs)/(endMs-startMs)*(W0-padL-padR);
+  const Y=cm=>padT+(1-(cm-cmMin)/((cmMax-cmMin)||1))*(H0-padT-padB);
+
+  // darkness band rectangles (sample every 15 min, shade where it's dark enough)
+  let darkRects='',cur=null;
+  for(let t=startMs;t<=endMs;t+=15*60e3){
+    const dk=visibility(new Date(t),DATA.loc.lat,DATA.loc.lon).twilight;
+    if(dk>0.15){ if(!cur)cur={a:t}; cur.b=t+15*60e3; }
+    else if(cur){darkRects+=rect(cur);cur=null;}
+  }
+  if(cur)darkRects+=rect(cur);
+  function rect(seg){const x=X(seg.a),w=X(seg.b)-X(seg.a);
+    return `<rect x="${x}" y="${padT}" width="${w}" height="${H0-padT-padB}" fill="rgba(20,45,80,.55)"/>`;}
+
+  // sunset / sunrise guide lines
+  let sunMarks='';
+  for(const [ms,lab] of [[night.sunsetMs,'☀ set'],[night.sunriseMs,'☀ rise']]){
+    if(ms==null||ms<startMs||ms>endMs)continue;
+    sunMarks+=`<line x1="${X(ms)}" y1="${padT}" x2="${X(ms)}" y2="${H0-padB}" stroke="rgba(255,210,120,.5)" stroke-width="1" stroke-dasharray="2 4"/>`;
+  }
+
+  // tide path
+  const d=pts.map((p,i)=>`${i?'L':'M'}${X(p.t).toFixed(1)} ${Y(p.cm).toFixed(1)}`).join(' ');
+  const area=`${d} L${X(pts[pts.length-1].t).toFixed(1)} ${H0-padB} L${X(pts[0].t).toFixed(1)} ${H0-padB} Z`;
+
+  // hour ticks every 3h
+  let ticks='';
+  for(let t=Math.ceil(startMs/(3600e3))*3600e3;t<=endMs;t+=3*3600e3){
+    ticks+=`<text x="${X(t)}" y="${H0-6}" fill="var(--ink-faint)" font-size="11" text-anchor="middle">${fmtTime(t)}</text>`;
+  }
+
+  const col=band(night.best?night.best.score:0).col;
+  svg.innerHTML=`
+    <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${col}" stop-opacity=".35"/>
+      <stop offset="1" stop-color="${col}" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${darkRects}${sunMarks}${ticks}
+    <path d="${area}" fill="url(#tg)"/>
+    <path d="${d}" fill="none" stroke="var(--glow)" stroke-width="2.5"/>
+    <g id="tidePlay"><line y1="${padT}" y2="${H0-padB}" stroke="var(--teal)" stroke-width="2"/>
+      <circle r="5" fill="var(--teal)" stroke="#02060f" stroke-width="2"/></g>`;
+  // expose mapping so the scrubber can move the playhead without redrawing
+  CHART_CTX={X,Y,startMs,endMs};
+}
+
+// draw the score-vs-time curve behind the scrubber (sunset → sunrise)
+function drawScrub(night){
+  const svg=document.getElementById('scrubSvg');
+  const W0=720,H0=120,padT=8,padB=4;
+  const c=night.curve;
+  if(!c||c.length<2){svg.innerHTML='';return;}
+  const X=i=>(i/(c.length-1))*W0;
+  const Y=s=>padT+(1-s/100)*(H0-padT-padB);
+  const d=c.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(p.score).toFixed(1)}`).join(' ');
+  const area=`${d} L${W0} ${H0-padB} L0 ${H0-padB} Z`;
+  // shade every best-window lobe (the stored ≥90%-of-peak runs)
+  const bestBand=(night.windows||[]).map(w=>
+    `<rect x="${X(w.lo)}" y="${padT}" width="${Math.max(2,X(w.hi)-X(w.lo))}" height="${H0-padT-padB}" fill="rgba(43,212,196,.14)"/>`).join('');
+  // gold dot marking the "catch it earlier" time
+  let easyMark='';
+  if(night.easyIdx!=null)
+    easyMark=`<circle cx="${X(night.easyIdx)}" cy="${Y(night.curve[night.easyIdx].score)}" r="4.5" fill="#ffd27a" stroke="#02060f" stroke-width="2"/>`;
+  svg.innerHTML=`
+    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--glow)" stop-opacity=".4"/>
+      <stop offset="1" stop-color="var(--glow)" stop-opacity="0"/></linearGradient></defs>
+    ${bestBand}
+    <path d="${area}" fill="url(#sg)"/>
+    <path d="${d}" fill="none" stroke="var(--glow)" stroke-width="2"/>
+    ${easyMark}
+    <g id="scrubPlay"><line y1="0" y2="${H0}" stroke="#fff" stroke-width="1.5" opacity=".85"/></g>`;
+}
+
+// move both playheads + refresh gauge/verdict/factors for the chosen step
+function setTime(idx){
+  const night=NIGHTS[SELECTED], c=night.curve;
+  if(!c||!c.length) return;
+  SEL_I=idx=Math.max(0,Math.min(c.length-1,idx));
+  const entry=c[idx];
+  setGauge(entry.score);
+  renderFactors(entry,night);
+  // selected-time readout (24h JST) + how it relates to the best window
+  document.getElementById('selTime').textContent=fmtTime(entry.dt);
+  const inWin=inAnyWindow(night,idx);
+  document.getElementById('selTag').textContent=
+    inWin?L('best window','見頃'):(entry.vis<0.05?L('before dark','まだ明るい'):L('selected','選択中'));
+  document.getElementById('snapBest').classList.toggle('hidden',inWin||!night.best);
+  // scrubber playhead
+  const sp=document.getElementById('scrubPlay');
+  if(sp) sp.setAttribute('transform',`translate(${(idx/(c.length-1))*720},0)`);
+  // tide-chart playhead
+  const tp=document.getElementById('tidePlay');
+  if(tp && CHART_CTX){
+    const x=CHART_CTX.X(entry.ms);
+    tp.querySelector('line').setAttribute('x1',x); tp.querySelector('line').setAttribute('x2',x);
+    const dot=tp.querySelector('circle');
+    if(night.hasTide && entry.env.cm!=null){ dot.setAttribute('cx',x); dot.setAttribute('cy',CHART_CTX.Y(entry.env.cm)); dot.style.display=''; }
+    else dot.style.display='none';
+    tp.style.display=(entry.ms>=CHART_CTX.startMs&&entry.ms<=CHART_CTX.endMs)?'':'none';
+  }
+}
+
+// keepIdx: if given, stay on that scrub position (used by silent refresh); else default to best window
+function select(i, keepIdx){
+  SELECTED=i;
+  const night=NIGHTS[i];
+  const has=night.curve&&night.curve.length>0;
+  const dt=new Date(`${night.dayKey}T12:00:00+09:00`);
+  document.getElementById('factorDay').textContent=
+    i===0?L('tonight','今夜'):`${dowName(dt.getDay())} ${night.m}/${night.d}`;
+  // best-window chip shows the RANGE(S) — the peak is usually a broad plateau, and a
+  // night can have two good windows (after dark, then again after moonset)
+  document.getElementById('bestTime').textContent=windowLabel(night);
+  document.getElementById('bestWrap').style.display=night.best?'inline-flex':'none';
+  // "catch it earlier" chip — only when the peak is late and there's a good earlier window
+  const easy=night.easyIdx!=null;
+  document.getElementById('easyWrap').classList.toggle('hidden',!easy);
+  if(easy) document.getElementById('easyTime').textContent=fmtTime(night.curve[night.easyIdx].dt);
+  document.getElementById('sunsetLbl').textContent =night.sunsetMs ?fmtTime(night.sunsetMs) :'—';
+  document.getElementById('sunriseLbl').textContent=night.sunriseMs?fmtTime(night.sunriseMs):'—';
+  // configure the slider over the night's curve (default to best window, or keep position)
+  const range=document.getElementById('timeRange');
+  const idx=has?(keepIdx!=null?Math.max(0,Math.min(keepIdx,night.curve.length-1)):night.curve.indexOf(night.best)):0;
+  range.min=0; range.max=has?night.curve.length-1:0; range.value=idx;
+  range.disabled=!has;
+  renderNights();
+  renderChart(night);
+  drawScrub(night);
+  if(has) setTime(idx);
+  else { setGauge(0); renderFactors(null,night); }
+}
+
+/* ---- moon-sensitivity control: re-score (no re-fetch / no astronomy) ---- */
+// recompute every step's visibility & score from the stored twilight + glare
+function rescoreNight(n){
+  if(!n.curve||!n.curve.length) return;
+  for(const c of n.curve){
+    c.vis=c.twilight*clamp(1-MOON_DIM*c.glare);
+    c.score=c.presence*c.vis*100;
+  }
+  let best=null; for(const c of n.curve){ if(!best||c.score>best.score) best=c; }
+  n.best=best;
+  computeWindows(n);
+}
+function moonLabel(v){
+  if(v<0.10) return ['Gentle','弱め'];
+  if(v<0.30) return ['Light','やや弱め'];
+  if(v<0.55) return ['Moderate','標準的'];
+  if(v<0.80) return ['Strong','強め'];
+  return ['Intense','強い'];
+}
+function updateMoonUI(){
+  const [en,jp]=moonLabel(MOON_DIM), pct=Math.round(MOON_DIM*100);
+  const atDefault=Math.abs(MOON_DIM-MOON_DIM_DEFAULT)<1e-9;
+  const label=LANG==='ja'?jp:en;
+  const sentence=LANG==='ja'
+    ? `晴れて満月が真上だと、見やすさが最大<b>${pct}%</b>下がります${atDefault?' · ✓ 予報値':''}`
+    : `A clear full moon overhead removes up to <b>${pct}%</b> of visibility${atDefault?' · ✓ forecasted value':''}`;
+  document.getElementById('moonRead').innerHTML=
+    `<b>${label}</b><br><span class="sub">${sentence}</span>`;
+  document.getElementById('moonReset').classList.toggle('hidden',atDefault);
+  const r=document.getElementById('moonRange');
+  if(r.value!==String(MOON_DIM)) r.value=MOON_DIM;
+}
+function setMoonDim(v){
+  MOON_DIM=v;
+  for(const n of NIGHTS) rescoreNight(n);
+  updateMoonUI();
+  if(NIGHTS.length) select(SELECTED);   // re-render; re-defaults to the (possibly new) best window
+}
+
+/* ============================ BOOT ============================ */
+function buildSparkles(){
+  const c=document.getElementById('sparkles');
+  if(c.childElementCount) return;
+  let h='';
+  for(let i=0;i<44;i++){
+    h+=`<i style="left:${Math.random()*100}%;top:${Math.random()*100}%;
+      --d:${(2.5+Math.random()*4).toFixed(1)}s;--delay:${(Math.random()*5).toFixed(1)}s"></i>`;
+  }
+  c.innerHTML=h;
+}
+
+function fillLocations(){
+  const sel=document.getElementById('locSel'), cur=sel.value;
+  sel.innerHTML=LOCATIONS.map(l=>`<option value="${l.id}">${LANG==='ja'?l.nameJp:l.nameEn}</option>`).join('');
+  if(cur) sel.value=cur;
+  sel.onchange=()=>boot(sel.value);
+}
+
+function buildAllNights(){            // next 7 nights starting tonight (JST), using current DATA + MOON_DIM
+  NIGHTS=[]; const t=jstDate(new Date());
+  let cur=new Date(`${t.y}-${pad(t.m)}-${pad(t.d)}T12:00:00+09:00`);
+  for(let i=0;i<7;i++){ const jd=jstDate(cur); NIGHTS.push(buildNight(DATA,jd.y,jd.m,jd.d)); cur=new Date(cur.getTime()+24*3600e3); }
+}
+
+/* ---- caching: render instantly from localStorage, refresh in the background ----
+   Tide is a deterministic daily prediction (good for the whole JST day); weather &
+   marine only update ~hourly. So a cache is valid for the day, and we silently
+   revalidate once it's older than CACHE_FRESH_MS.                                  */
+const CACHE_FRESH_MS = 60*60*1000;   // within 1h, trust the cache; older → background refresh
+const CACHE_PREFIX='yk-cache:';
+function todayKey(){ const t=jstDate(new Date()); return `${t.y}-${t.m}-${t.d}`; }
+function writeCache(id,data){
+  try{ localStorage.setItem(CACHE_PREFIX+id, JSON.stringify(
+    {savedAt:Date.now(), day:todayKey(), H:data.H, tideSamples:data.tideSamples,
+     tideDays:data.tideDays, hasTide:data.hasTide})); }catch(e){}
+}
+function readCache(id){
+  try{
+    const p=JSON.parse(localStorage.getItem(CACHE_PREFIX+id)||'null');
+    if(!p || p.day!==todayKey()) return null;            // missing, or from a previous day
+    const loc=LOCATIONS.find(l=>l.id===id);
+    return {savedAt:p.savedAt, data:{loc,H:p.H,tideSamples:p.tideSamples,tideDays:p.tideDays,hasTide:p.hasTide}};
+  }catch(e){ return null; }
+}
+function setUpdating(on){
+  const el=document.getElementById('updated');
+  if(on) el.textContent=el.textContent.replace(/ · .*$/,'')+' · '+L('updating…','更新中…');
+  else setMeta();
+}
+let REVALIDATING=false;
+async function revalidate(loc){                          // silent background refresh
+  if(REVALIDATING) return; REVALIDATING=true; setUpdating(true);
+  try{
+    const fresh=await loadData(loc);
+    if(document.getElementById('locSel').value!==loc.id) return;   // user switched location meanwhile
+    fresh.updatedAt=new Date(); DATA=fresh; writeCache(loc.id,DATA);
+    const keep=SEL_I; buildAllNights();
+    select(Math.min(SELECTED,NIGHTS.length-1), keep);              // keep night + scrub position
+  }catch(e){ /* keep the cached view on a failed refresh */ }
+  finally{ REVALIDATING=false; setUpdating(false); }
+}
+
+async function boot(locId){
+  buildSparkles(); fillLocations();
+  const loc=LOCATIONS.find(l=>l.id===locId)||LOCATIONS[0];
+  document.getElementById('locSel').value=loc.id;
+  const cached=readCache(loc.id);
+  if(cached){                                            // instant paint, no spinner
+    DATA=cached.data; DATA.updatedAt=new Date(cached.savedAt);
+    buildAllNights(); SELECTED=0; setMeta(); show('app'); select(0);
+    if(Date.now()-cached.savedAt > CACHE_FRESH_MS) revalidate(loc);   // stale → refresh quietly
+    return;
+  }
+  show('loading');                                       // cold start only (first ever visit / new day)
+  try{
+    DATA=await loadData(loc); DATA.updatedAt=new Date(); writeCache(loc.id,DATA);
+    buildAllNights(); SELECTED=0; setMeta(); show('app'); select(0);
+  }catch(err){
+    console.error(err);
+    document.getElementById('errmsg').textContent=L('Couldn’t load live data: ','データを読み込めませんでした：')+err.message;
+    show('error');
+  }
+}
+
+// language-aware "updated" line + footer credits
+function setMeta(){
+  if(!DATA) return;
+  const loc=DATA.loc;
+  document.getElementById('updated').textContent=L('Updated','更新')+' '+fmtTime(DATA.updatedAt||new Date())+' JST';
+  document.getElementById('foot').textContent=LANG==='ja'
+    ? `${loc.nameJp}（${loc.lat}, ${loc.lon}）· ${DATA.hasTide?'潮位: tide736.net / 気象庁':'この地点は潮位データなし'}`
+    : `${loc.nameEn} (${loc.lat}, ${loc.lon}) · ${DATA.hasTide?'tide: tide736.net / JMA':'tide unavailable here'}`;
+}
+
+// switch language: persist, flip the root lang (CSS reveals the right copy), re-render
+function applyLang(lang){
+  LANG=(lang==='ja')?'ja':'en';
+  document.documentElement.lang=LANG;
+  try{localStorage.setItem('yk-lang',LANG);}catch(e){}
+  document.querySelectorAll('#langTog button').forEach(b=>b.classList.toggle('active',b.dataset.lang===LANG));
+  if(DATA){ fillLocations(); select(SELECTED); updateMoonUI(); setMeta(); }
+}
+function show(which){
+  for(const id of ['loading','error','app'])
+    document.getElementById(id).classList.toggle('hidden',id!==which);
+}
+
+function snapToBest(){
+  const n=NIGHTS[SELECTED]; if(!n||!n.best) return;
+  const idx=n.curve.indexOf(n.best);
+  document.getElementById('timeRange').value=idx;
+  setTime(idx);
+}
+function snapToEasy(){
+  const n=NIGHTS[SELECTED]; if(!n||n.easyIdx==null) return;
+  document.getElementById('timeRange').value=n.easyIdx;
+  setTime(n.easyIdx);
+}
+// language toggle — set the initial language (from localStorage or the browser) first
+document.querySelectorAll('#langTog button').forEach(b=>b.addEventListener('click',()=>applyLang(b.dataset.lang)));
+applyLang(LANG);
+// wire the scrubber controls once
+document.getElementById('timeRange').addEventListener('input',e=>setTime(+e.target.value));
+document.getElementById('snapBest').addEventListener('click',snapToBest);
+document.getElementById('bestWrap').addEventListener('click',snapToBest);
+document.getElementById('easyWrap').addEventListener('click',snapToEasy);
+// moon-sensitivity control
+document.getElementById('moonRange').addEventListener('input',e=>setMoonDim(+e.target.value));
+document.getElementById('moonReset').addEventListener('click',()=>setMoonDim(MOON_DIM_DEFAULT));
+// place the "Forecasted" marker at its real position on the 0→1 track
+// (thumb is 22px wide, so its centre travels within an 11px inset on each end)
+(()=>{ const r=document.getElementById('moonRange'), f=(MOON_DIM_DEFAULT-r.min)/(r.max-r.min);
+  document.getElementById('moonTick').style.left=`calc(11px + (100% - 22px) * ${f})`; })();
+updateMoonUI();
+// while the page stays open, quietly re-check the live data every hour, and when the
+// tab is re-focused if the cache has gone stale (cheap: cache makes most loads instant)
+setInterval(()=>{ const loc=DATA&&LOCATIONS.find(l=>l.id===document.getElementById('locSel').value);
+  if(loc) revalidate(loc); }, CACHE_FRESH_MS);
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible'||!DATA) return;
+  const c=readCache(DATA.loc.id);
+  if(!c || Date.now()-c.savedAt>CACHE_FRESH_MS) revalidate(DATA.loc);
+});
+
+boot();
+</script>
+</body>
+</html>
